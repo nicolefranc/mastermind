@@ -1,20 +1,90 @@
-import kivy
-kivy.require('1.11.1')
-from kivy.app import App
-from kivy.uix.label import Label
 import libdw.sm as sm
 import random
+import subprocess
+subprocess.call('', shell=True)
 
 class Board:
 	def __init__(self, rounds=8):
-		self.palette = ["red", "orange", "yellow", "green", "blue", "pink",  "violet", "black"]
-		self.secret_code = None
+		self.palette = ["red", "green", "yellow", "blue", "pink", "cyan",  "violet", "white"]
 		self.rounds = rounds
+		self.secret_code = None
 		self.generate_code()
+		self.board = None
+		print(self.display_board())
 		
+		
+	def prRed(self,skk): 
+		print("\033[91m {}\033[00m".format(skk)) 
+
 	def generate_code(self):
 		self.secret_code = random.choices(self.palette, k=4)
 		print("=== FOR TESTING PURPOSE ONLY ===\n", self.secret_code)
+
+	def display_board(self, peg_data=None, key_data=None):
+		peg_symbol = "[__]"
+		peg = self.add_color("inactive", peg_symbol)
+		key_symbol = "-"
+		key = self.add_color("inactive", key_symbol)
+
+		# make the peg changes here
+		# board[0][0] = "c"
+		if peg_data != None:
+			color = peg_data[0]
+			row_idx = peg_data[1]
+			peg_idx = peg_data[2]
+			print("Peg to change: ", peg_data)
+
+			self.board[row_idx][peg_idx] = self.add_color(color, peg_symbol)
+		elif key_data != None:
+			row_idx = self.rounds-1
+			for i, key in enumerate(key_data):
+				if key == "black":
+					# replace with x
+					self.board[row_idx][i+4] = "x"
+				elif key == "green":
+					# replace with o
+					self.board[row_idx][i+4] = "o"
+
+		# display an empty board
+		else:
+			peg_row = [peg, peg, peg, peg]
+			key_row = [key, key, key, key]
+
+			row = peg_row + key_row
+			self.board = [row[:], row[:], row[:], row[:], row[:], row[:], row[:], row[:]]
+
+		for row in self.board:
+			row.insert(4, " | ")
+		display_str = "M A S T E R M I N D\t\ttimer s\n\n"
+		for row in self.board:
+			display_str = display_str + "  ".join(row) + "\n\n"
+
+		return display_str
+	
+	def add_color(self, inp, str_to_color):
+		colored_str = ""
+		if inp == "red":
+			colored_str = "\033[91m{}\033[00m"
+		elif inp == "green":
+			colored_str = "\033[92m{}\033[00m"
+		elif inp == "yellow":
+			colored_str = "\033[93m{}\033[00m"
+		elif inp == "blue":
+			colored_str = "\033[94m{}\033[00m"
+		elif inp == "pink":
+			colored_str = "\033[95m{}\033[00m"
+		elif inp == "cyan":
+			colored_str = "\033[96m{}\033[00m"
+		elif inp == "violet":
+			colored_str = "\033[35m{}\033[00m"
+		elif inp == "white":
+			colored_str = "\033[38;5;255m{}\033[00m"
+		elif inp == "black":
+			colored_str = "\033[90m{}\033[00m"
+		elif inp == "inactive":
+			colored_str = "\033[38;5;247m{}\033[00m"
+		
+		return colored_str.format(str_to_color)
 
 class RowPegs(Board):
 	def __init__(self, pegs, key_pegs, row_length):
@@ -48,7 +118,7 @@ class RowPegs(Board):
 				code.remove(peg)
 				
 		is_decoded = all(key == "black" for key in key_pegs) if len(key_pegs) == 4 else False
-		return is_decoded
+		return is_decoded 
 
 	def reset(self):
 		self.pegs = list()
@@ -64,7 +134,9 @@ CONFIRM = "confirm" # end row
 WIN = "win"
 END = "end"
 
-class Mastermind(sm.SM, App):
+
+COLORS = ["red", "green", "yellow", "blue", "pink", "cyan",  "violet", "white"]
+class Mastermind(sm.SM):
 	def __init__(self):
 		# game initialised, code generated
 		pegs = list()
@@ -77,29 +149,33 @@ class Mastermind(sm.SM, App):
 		current_state = state[0]
 		row = state[1]
 		
-		COLORS = row.palette
-		
 		if inp in COLORS and current_state == INIT:
 			row.add_peg(inp)
+
+			peg_length = row.get_peg_length()
+			peg_data = (inp, row.rounds-1, peg_length-1)
+
 			next_state = [MOVE_WAIT, row]
-			output = f"Peg #{row.get_peg_length() + 1}"
+			output = row.display_board(peg_data)
 			return next_state, output
 		
 		elif inp in COLORS and current_state == MOVE_WAIT:
 			row.add_peg(inp)
 			peg_length = row.get_peg_length()
+			peg_data = (inp, row.rounds-1, peg_length-1)
+			output = row.display_board(peg_data)
 
 			# if last peg, wait for confirmation
 			# else, wait for next move
 			if peg_length == row.row_length:
-				output = "Your code is"
+				output += "\nYour code is"
 				for color in row.pegs:
 					output = output + " " + color 
 				output += "\nConfirm?"
 				next_state = [CONFIRM_WAIT, row]
 				return next_state, output
 
-			output = f"Peg #{peg_length + 1}"
+			output = row.display_board(peg_data=peg_data)
 			next_state = [MOVE_WAIT, row]
 			return next_state, output
 
@@ -109,12 +185,13 @@ class Mastermind(sm.SM, App):
 			# if not decoded, next state is init
 			# else win
 			is_decoded = row.validate_pegs()
-			output = row.key_pegs
+			output = row.display_board(key_data=row.key_pegs)
+			print("KEYS: ", row.key_pegs)
 			if is_decoded:
-				output = f"{row.key_pegs}\nIt is indeed you, Mr Holmes. Sherlock Holmes."
+				output += "\nIt is indeed you, Mr Holmes. Sherlock Holmes."
 				next_state = [END, row]
 			elif row.rounds == 1:
-				output = f"{row.key_pegs}\nSeems like your luck ran out. Don't buy 4D."
+				output += "\nSeems like your luck ran out. Don't buy 4D."
 				next_state = [END, row]
 			else:
 				row.reset()
@@ -145,7 +222,15 @@ class Mastermind(sm.SM, App):
 		self.start()
 		peg_count = 4
 
+		# subprocess.call("", shell=True)
 		print("Code generated.\nYour turn, Sherlock.")
+
+		# print(self.display_board())
+		# palette = "Here are your choices:\n"
+		# for color in COLORS:
+		# 	palette += self.add_color(color, color) +  " "
+		# print(palette)
+
 		while(True):
 			if (not self.done(self.state)):
 					inp = input(">>>\t")
@@ -155,26 +240,5 @@ class Mastermind(sm.SM, App):
 				break
 		print("Bye.")
 
+
 Mastermind().run()
-# if __name__ == '__main__':
-# # 	Mastermind().run()
-# 	mm = Mastermind()
-	
-# 	for row in range(8):
-# 		code_pegs = []
-# 		print(f"Row {row+1}:")
-# 		for i in range(4): 
-# 			inp = input(f"Guess #{i+1}:")
-# 			if inp == "exit":
-# 				break
-# 			code_pegs.append(inp)
-			
-# 		hints = mm.validate_pegs(code_pegs)
-# 		print("Results:", *hints)
-# 		# Check if there are 4 items in the list
-# 		# Assess if all are black
-# 		if len(hints) == 4:
-# 			result = all(hint == "black" for hint in hints)
-# 			if result:
-# 				print(f"YOU WON!\nIt only took you {row+1} tries.")
-# 				break
