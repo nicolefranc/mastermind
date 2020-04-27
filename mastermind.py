@@ -3,23 +3,25 @@ import random
 import subprocess
 import time
 import os
+import sys
+
+# Constants
+INIT = "initialised"
+START = "start"
+MOVE_WAIT = "wait for move"
+CONFIRM_WAIT = "wait for confirmation"
+END = "end"
+
 subprocess.call('', shell=True)
 
 class Board:
 	def __init__(self, rounds=8):
 		self.palette = ["red", "green", "yellow", "blue", "pink", "cyan",  "violet", "white"]
 		self.rounds = rounds
-		self.secret_code = None
-		self.generate_code()
 		self.board = None
 		
-		
-	def prRed(self,skk): 
-		print("\033[91m {}\033[00m".format(skk)) 
-
 	def generate_code(self):
 		self.secret_code = random.choices(self.palette, k=4)
-		# print("=== FOR TESTING PURPOSE ONLY ===\n", self.secret_code)
 
 	def display_board(self, peg_data=None, key_data=None):
 		peg_symbol = "[__]"
@@ -28,12 +30,10 @@ class Board:
 		key = self.add_color("inactive", key_symbol)
 
 		# make the peg changes here
-		# board[0][0] = "c"
 		if peg_data != None:
 			color = peg_data[0]
 			row_idx = peg_data[1]
 			peg_idx = peg_data[2]
-			# print("Peg to change: ", peg_data)
 			self.board[row_idx][peg_idx] = self.add_color(color, peg_symbol)
 		elif key_data != None:
 			row_idx = self.rounds-1
@@ -60,12 +60,12 @@ class Board:
 			display_str = display_str + "  ".join(row) + "\n\n"
 
 		
-		display_str += "\nYour choices:\n [ "
+		display_str += "\nEnter one of these colours and hit enter\n [ "
 		for color in self.palette:
 			display_str = display_str + self.add_color(color, color) + " " if color == self.palette[-1] else  display_str + self.add_color(color, color) + " / "
 		display_str += "]\n"
 		display_str += "\n\033[38;5;247mUnsure? Press\033[38;5;248m H \033[38;5;247mfor help. \nA quitter? Press \033[38;5;248mQ \033[38;5;247mto quit.\n"
-		display_str += "In life, you can't undo. But here can. Press \033[38;5;248mB \033[38;5;247mto undo.\033[00m\n"
+		display_str += "Rewind? Press \033[38;5;248mB \033[38;5;247mto undo.\033[00m\n"
 		return display_str
 	
 	def add_color(self, inp, str_to_color):
@@ -140,50 +140,38 @@ class RowPegs(Board):
 	def reset(self):
 		self.pegs = list()
 		self.key_pegs = list()
-		# print(self.secret_code)
-
-
-INIT = "initialised"
-START = "start"
-MOVE_WAIT = "wait for move"
-CONFIRM_WAIT = "wait for confirmation"
-CONFIRM = "confirm" # end row
-# UNDO = "undo"
-WIN = "win"
-END = "end"
-
-
-COLORS = ["red", "green", "yellow", "blue", "pink", "cyan",  "violet", "white"]
 
 def convert_time(elapsed_time):
 	hours, rem = divmod(elapsed_time, 3600)
 	minutes, seconds = divmod(rem, 60)
-	return "{:>2}m {:.0f}s".format(int(minutes),seconds) if int(minutes) > 0 else "{:.0f}s".format(seconds)
+	return "{:0>2}m {:.0f}s".format(int(minutes),seconds) if int(minutes) > 0 else "{:.0f}s".format(seconds)
 
 def clear_terminal():
-	os.system('cls')
+	if sys.platform.startswith('win32'):
+		os.system('cls')
+	elif sys.platform.startswith('darwin'):
+		os.system('clear')
 
 class Mastermind(sm.SM):
 	def __init__(self):
-		# game initialised, code generated
 		pegs = list()
 		key_pegs = list()
 		row_length = 4
 		self.start_state = [INIT, RowPegs(pegs, key_pegs, row_length)]
 		self.start_time = time.time()
-		# print(self.start_time)
 
 	def get_next_values(self, state, inp):
+		inp = inp.lower()
 		current_state = state[0]
 		row = state[1]
-		
+
 		if inp == "" and current_state == INIT:
 			next_state = [START, row]
 			output = row.display_board()
 			clear_terminal()
 			return next_state, output
 
-		elif inp in COLORS and current_state == START:
+		elif inp in row.palette and current_state == START:
 			row.add_peg(inp)
 
 			peg_length = row.get_peg_length()
@@ -194,7 +182,7 @@ class Mastermind(sm.SM):
 			clear_terminal()
 			return next_state, output
 		
-		elif inp in COLORS and current_state == MOVE_WAIT:
+		elif inp in row.palette and current_state == MOVE_WAIT:
 			row.add_peg(inp)
 			peg_length = row.get_peg_length()
 			peg_data = (inp, row.rounds-1, peg_length-1)
@@ -203,9 +191,6 @@ class Mastermind(sm.SM):
 			# if last peg, wait for confirmation
 			# else, wait for next move
 			if peg_length == row.row_length:
-				output += "\nYour code is"
-				for color in row.pegs:
-					output = output + " " + color 
 				output += "\nPress Y to confirm."
 				clear_terminal()
 				next_state = [CONFIRM_WAIT, row]
@@ -216,57 +201,58 @@ class Mastermind(sm.SM):
 			next_state = [MOVE_WAIT, row]
 			return next_state, output
 
-		elif inp == "Y" and current_state == CONFIRM_WAIT:
-			# evaluate guess, get and display key pegs
-			# round ends, round--
-			# if not decoded, next state is init
-			# else win
+		elif inp == "y" and current_state == CONFIRM_WAIT:
 			is_decoded = row.validate_pegs()
 			output = row.display_board(key_data=row.key_pegs)
-			# print("KEYS: ", row.key_pegs)
 			end_time = time.time()
 			elapsed_time = convert_time(end_time-self.start_time)
 			if is_decoded:
-				output += f"\n\n\n---\n\nYou solved it in {elapsed_time}!\n"
+				output += "\n---\n\n"
 				output += row.show_code()
-				output += "\n\nWeird flex but ok."
+				output += f"\n\nYou solved it in {elapsed_time}!"
+				output += "\nWeird flex but ok."
 				clear_terminal()
 				next_state = [END, row]
 			elif row.rounds == 1:
-				output += f"\n\n\n---\n\nSeems like you ran out of luck after {elapsed_time}.\n"
+				output += "\n---\n\n"
 				output += row.show_code()
-				output += "\n\nTook you long enough. Don't gamble."
+				output += f"\n\nSeems like you ran out of luck after {elapsed_time}."
+				output += "\nTook you long enough. Don't gamble."
 				clear_terminal()
 				next_state = [END, row]
 			else:
 				row.reset()
 				row.rounds -= 1
-				# print("NEXT ROUND:", row.rounds)
 				clear_terminal()
 				next_state = [MOVE_WAIT, row]
 			return next_state, output
 
-		elif inp == "B":
+		elif inp == "b":
 			peg_length = row.get_peg_length()
 			success = row.undo()
 			next_state = [MOVE_WAIT, row]
 			peg_data = ("inactive", row.rounds-1, peg_length-1)
-			output = row.display_board(peg_data) if success else "\nNothing to undo. Choose a color.\n"
-			clear_terminal()
+			if success:
+				output = row.display_board(peg_data) 
+				clear_terminal()
+			else:
+				output = "\nNothing to undo.\n"
 			return next_state, output
 
-		elif inp == "H":
+		elif inp == "h":
 			output = "---\n\n Guess the code that I'm keeping secret.\n"
+			output += " Enter one of the colors in the choices and hit Enter\n"
 			output += " You will be given the following clues after every row:\n"
 			output += "   x  -  you guessed the \033[92mright\033[00m color in the \033[92mcorrect\033[00m position\n"
 			output += "   o  -  you guessed the \033[92mright\033[00m color but in the \033[91mwrong\033[00m position\n"
+			output += " Take note: the order of the hints does not matter\n"
 			output += " May you uncover your inner Sherlock Holmes. Good Luck!\n\n---"
 			return state, output
 
-		elif inp == "Q":
+		elif inp == "q":
 			end_time = time.time()
 			elapsed_time = convert_time(end_time-self.start_time)
-			output = "---\n\n  I DID NOT RAISE A QUITTER!\n\t - No longer your Mom\n\n  You are hereby disowned."
+			output = "---\n\n  I DID NOT RAISE A QUITTER!\n\t\t  - Your Mom\n\n  You are hereby disowned."
 			output += f"\n  Although it only took you {elapsed_time} to quit. Well done."
 			next_state = [END, None]
 			return next_state, output
@@ -277,22 +263,19 @@ class Mastermind(sm.SM):
 
 	def done(self, state):
 		current_state = state[0]
-		# if current_state is at rounds = 0, return True
-		# 	or all key_pegs are black, return True
-		# else, return False
 		return True if current_state == END else False
 			
 
 	def run(self):
 		self.start()
-		peg_count = 4
 
-		# subprocess.call("", shell=True)
 		print("Welcome welcome.")
 		print("---\n\n Guess the code that I'm keeping secret.\n")
+		print(" Enter one of the colors in the choices and hit Enter\n")
 		print(" You will be given the following clues after every row:\n")
 		print("   x  -  you guessed the \033[92mright\033[00m color in the \033[92mcorrect\033[00m position\n")
 		print("   o  -  you guessed the \033[92mright\033[00m color but in the \033[91mwrong\033[00m position\n")
+		print(" Take note: the order of the hints does not matter\n")
 		print(" May you uncover your inner Sherlock Holmes. Good Luck!\n")
 		print("Press ENTER to begin.\n\n---")
 
@@ -303,7 +286,6 @@ class Mastermind(sm.SM):
 					print(output)
 			else:
 				break
-		print("\n---\nFarewell.")
-
+		print("\n---\nGoodbye.")
 
 Mastermind().run()
