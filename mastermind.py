@@ -18,6 +18,8 @@ class Board:
 	def __init__(self, rounds=8):
 		self.palette = ["red", "green", "yellow", "blue", "pink", "cyan",  "violet", "white"]
 		self.rounds = rounds
+		self.secret_code = None
+		self.generate_code()
 		self.board = None
 		
 	def generate_code(self):
@@ -202,6 +204,10 @@ class Mastermind(sm.SM):
 			return next_state, output
 
 		elif inp == "y" and current_state == CONFIRM_WAIT:
+			# evaluate guess, get and display key pegs
+			# round ends, round--
+			# if not decoded, next state is move_wait
+			# else win
 			is_decoded = row.validate_pegs()
 			output = row.display_board(key_data=row.key_pegs)
 			end_time = time.time()
@@ -227,7 +233,7 @@ class Mastermind(sm.SM):
 				next_state = [MOVE_WAIT, row]
 			return next_state, output
 
-		elif inp == "b":
+		elif inp == "b" and current_state != INIT:
 			peg_length = row.get_peg_length()
 			success = row.undo()
 			next_state = [MOVE_WAIT, row]
@@ -236,23 +242,21 @@ class Mastermind(sm.SM):
 				output = row.display_board(peg_data) 
 				clear_terminal()
 			else:
-				output = "\nNothing to undo.\n"
+				output = "\nNothing to undo. Choose a color.\n"
 			return next_state, output
 
 		elif inp == "h":
 			output = "---\n\n Guess the code that I'm keeping secret.\n"
-			output += " Enter one of the colors in the choices and hit Enter\n"
 			output += " You will be given the following clues after every row:\n"
 			output += "   x  -  you guessed the \033[92mright\033[00m color in the \033[92mcorrect\033[00m position\n"
 			output += "   o  -  you guessed the \033[92mright\033[00m color but in the \033[91mwrong\033[00m position\n"
-			output += " Take note: the order of the hints does not matter\n"
 			output += " May you uncover your inner Sherlock Holmes. Good Luck!\n\n---"
 			return state, output
 
 		elif inp == "q":
 			end_time = time.time()
 			elapsed_time = convert_time(end_time-self.start_time)
-			output = "---\n\n  I DID NOT RAISE A QUITTER!\n\t\t  - Your Mom\n\n  You are hereby disowned."
+			output = "---\n\n  I DID NOT RAISE A QUITTER!\n\t - No longer your Mom\n\n  You are hereby disowned."
 			output += f"\n  Although it only took you {elapsed_time} to quit. Well done."
 			next_state = [END, None]
 			return next_state, output
@@ -271,11 +275,9 @@ class Mastermind(sm.SM):
 
 		print("Welcome welcome.")
 		print("---\n\n Guess the code that I'm keeping secret.\n")
-		print(" Enter one of the colors in the choices and hit Enter\n")
 		print(" You will be given the following clues after every row:\n")
 		print("   x  -  you guessed the \033[92mright\033[00m color in the \033[92mcorrect\033[00m position\n")
 		print("   o  -  you guessed the \033[92mright\033[00m color but in the \033[91mwrong\033[00m position\n")
-		print(" Take note: the order of the hints does not matter\n")
 		print(" May you uncover your inner Sherlock Holmes. Good Luck!\n")
 		print("Press ENTER to begin.\n\n---")
 
