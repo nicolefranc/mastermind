@@ -1,15 +1,6 @@
----
-title: "Mastermind"
-author: Nicole Yu
----
-
 # Mastermind
 
 A command line version of the classic puzzle game applying the concept of state machines utilising the [libdw library](https://github.com/kurniawano/libdw/blob/master/libdw/sm.py).
-
-## Table of Contents
-
-[TOC]
 
 ## Requirements
 
@@ -24,7 +15,7 @@ python mastermind.py
 
 ### Objective
 
-To decode the key that the script has generated
+To decode the colour combinations (key) that the script has generated
 
 ### Game Play
 
@@ -49,7 +40,7 @@ Decode the key in the shortest amount of time with the lowest possible number of
 
 ## Demo
 
-![](https://i.imgur.com/M2JWLzg.gif)
+![](https://i.imgur.com/QGVvzZq.gif)
 
 > To view my demonstration video go to: [https://youtu.be/RNdu-BwAOVk](https://)
 
